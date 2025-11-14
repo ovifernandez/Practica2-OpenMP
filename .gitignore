@@ -1,0 +1,15 @@
+# Visual Studio cache
+.vs/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+build/
+
+# IDE files
+*.VC.db
+*.suo
+*.user
+*.vcxproj.filters
+*.vcxproj.user
