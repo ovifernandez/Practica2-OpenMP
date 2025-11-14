@@ -104,6 +104,10 @@ int main(int argc, char** argv) {
 	std::cout << "\n\n------------------------------------" << std::endl;
 	std::cout << "Speedup (T_seq / T_par): " << speedup << "x" << std::endl;
 
+	//En este caso, tras ejecutar, vemos como la funcion a ejecutar solo consta de una multiplicacion, una suma y una division, 
+	// Por lo que el tiempo secuencial es más rapido.
+	//El paralelo pierde eficiencia al tener que crear 16 hilos, distribuirles a cada hilo su curro, y hacer que se comuniquen (overhead).
 
+	//Por ello, en tareas con una funcion a ejecutar tan sencilla, no veremos mejoria, de hecho, incluso perderemos eficiencia.
 	return 0;
 }
