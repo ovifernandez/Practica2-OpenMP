@@ -22,6 +22,7 @@ double funcion_x_heavy(double x) {
 void Parte1(long long N);
 void Parte2(long long N);
 void Parte3(long long N);
+void TestSincronizacion(long long N);
 void Parte3_SinFalseSharing(long long N);
 
 int main(int argc, char** argv) {
@@ -36,6 +37,7 @@ int main(int argc, char** argv) {
 	Parte1(N);
 	Parte2(N);
 	Parte3(N);
+	TestSincronizacion(N);
 	Parte3_SinFalseSharing(N);
 
 return 0;
@@ -283,7 +285,7 @@ void Parte2(long long N) {
 }
 
 void Parte3(long long N) {
-	std::cout << "\n >>> PARTE 3: Montecarlo\n";
+	std::cout << "\n >>> PARTE 3.1: Montecarlo\n";
 	std::cout << " " << std::string(40, '-') << "\n";
 	//La logica es la siguiente: 
 		//Imagina un cuadrado de lados 2, Area 4 u2, centrado en el (0,0) 
@@ -304,6 +306,7 @@ void Parte3(long long N) {
 
 #pragma omp parallel reduction(+: aciertos)
 	{
+
 		//La semilla se basa en el numero de hilo, su id
 	unsigned int seed = omp_get_thread_num();
 	//Cada hilo crea su propio generador, para eliminar carreras posibles, mediante la semilla más el tiempo de creacion del hilo. 
@@ -339,6 +342,84 @@ struct alignas(64) Contador {
 	long long valor;
 };
 
+void TestSincronizacion(long long N) {
+	std::cout << "\n >>> PARTE 3.2.1: Sincronizacion MC vs Trapecio\n";
+	std::cout << " " << std::string(40, '-') << "\n";
+
+	// Test Trapecio (1 hilo)
+	double h = 1.0 / static_cast<double>(N);
+	double alturas_secuencial = 0.0;
+	double t0_trap, t1_trap, t_trap;
+
+	t0_trap = omp_get_wtime();
+	alturas_secuencial = funcion_x(0.0) + funcion_x(1.0);
+
+	for (long long i = 1; i < N; i++) {
+		double x = h * static_cast<double>(i);
+		alturas_secuencial += 2.0 * funcion_x(x);
+	}
+
+	double pi_secuencial = (h / 2.0) * alturas_secuencial;
+
+	t1_trap = omp_get_wtime();
+	t_trap = (t1_trap - t0_trap) * 1000; //En ms.
+	double tiempo_trap_iteracion = (t_trap * 1000000) / static_cast<double>(N); // ns
+
+	// ARREGLO 1: Engañar al compilador usando la variable
+	if (pi_secuencial == -1.0) std::cout << "Ignorar";
+
+	// Test Monte Carlo (1 hilo)
+	long long aciertos = 0;
+	unsigned int seed = omp_get_thread_num();
+	std::mt19937 generador(seed + (unsigned int)time(NULL));
+	std::uniform_real_distribution<double> distribucion(-1.0, 1.0);
+
+
+	double t0_mc = omp_get_wtime();
+
+	for (long long i = 0; i < N; i++) {
+		double x = distribucion(generador);
+		double y = distribucion(generador);
+		if ((x * x + y * y) <= 1) {
+			aciertos++;
+		}
+	}
+	double t1_mc = omp_get_wtime();
+	double t_mc = (t1_mc - t0_mc) * 1000.0; // Pasamos a milisegundos
+	double tiempo_mc_iteracion = (t_mc * 1000000) / static_cast<double>(N); // ns
+
+	if (aciertos == -1) std::cout << "Ignorar";
+
+	std::cout << std::fixed << std::setprecision(5);
+	std::cout << "  Trapecio (1 hilo)   : " << t_trap << " ms total"
+		<< " -> " << tiempo_trap_iteracion << " ns/iteracion\n";
+	std::cout << "  Monte Carlo (1 hilo): " << t_mc << " ms total"
+		<< " -> " << tiempo_mc_iteracion << " ns/iteracion\n";
+
+	double ratio_trabajo = tiempo_mc_iteracion / tiempo_trap_iteracion;
+	std::cout << "\n---Monte Carlo es " << std::setprecision(5) << ratio_trabajo
+		<< "x mas costoso por iteracion\n";
+
+	std::cout << "\n >>> PARTE 3.2.2: Analisis Overhead de Paralelizacion\n";
+	std::cout << " " << std::string(40, '-') << "\n";
+
+	double overhead_us = 50.0; // Estimación conservadora
+	double iteraciones_para_amortizar_trap = (overhead_us * 1000.0) / tiempo_trap_iteracion;
+	double iteraciones_para_amortizar_mc = (overhead_us * 1000.0) / tiempo_mc_iteracion;
+
+	std::cout << "  Iteraciones necesarias para amortizar overhead:\n";
+	std::cout << "    - Trapecio: ~" << std::setprecision(1) << iteraciones_para_amortizar_trap
+		<< " iteraciones\n";
+	std::cout << "    - Monte Carlo: ~" << iteraciones_para_amortizar_mc << " iteraciones\n\n";
+
+	std::cout << "  \033[1;33m CONCLUSION:\033[0m\n";
+	std::cout << "    El Trapecio necesita "
+		<< std::setprecision(1) << (iteraciones_para_amortizar_trap / iteraciones_para_amortizar_mc)
+		<< "x MAS iteraciones que Monte Carlo\n";
+	std::cout << "    para que la paralelizacion compense el overhead.\n";
+}
+
+
 void Parte3_SinFalseSharing(long long N) {
 	//Para el apartado de optimizar este ejercicio, hemos decidido explorar el de False Sharing.
 	//A veces se produce este false sharing del que hablamos.
@@ -349,11 +430,11 @@ void Parte3_SinFalseSharing(long long N) {
 	//Si B quisiese escribir en su contador, se le pararian los pies, ya que ese bloque estaria ocupado temporalmente.
 
 
-	//Como solucionamos esto? Como evitamos que dos contadores se hallen en el mismo bloque? Muy sencillo!
+	//Como solucionamos esto? Como evitamos que dos contadores se hallen en el mismo bloque?
 	//Hacemos que cada contador tenga una estructura que ocupe 64B, aunque de esos 64B solo use los 8B del valor de long long contador.
 	//De esta manera, te aseguras al 100% que no se van a producir más condiciones de false sharing.
 
-	std::cout << "\n >>> PARTE 3.2: Monte Carlo (Optimizado - Padding)\n";
+	std::cout << "\n >>> PARTE 3.3: Monte Carlo (Optimizado - Padding)\n";
 	std::cout << " " << std::string(40, '-') << "\n";
 	//Esto otorga a cada hilo su propio contador privado, que ocupa 64B.
 	
