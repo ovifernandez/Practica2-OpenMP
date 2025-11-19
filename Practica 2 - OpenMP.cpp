@@ -147,16 +147,19 @@ void Parte2(long long N) {
 		//exp(), sin(), pow(), y multiplicaciones para cada i.
 		//Lo logico es pensar que como cada i tiene que realizar las mismas operaciones, lo más optimos erá static, dado que se supone una carga "balanceada".
 		//Si hubiese, por ejemplo, zonas de x en las que no existiese la gráfica, en ese x en concreto no habría que calcular nada, por lo que el reparto de carga no sería el mismo para todo X.
-		//Como no es el caso, podriamos caer en la trampa de pensar que static seria lo mejor
+		//Como no es el caso, podriamos caer en la trampa de pensar que static seria lo mejor.
 		// 
-		//Sin embargo, si nos metemos a nivel matemático y gráfico.
-		//Lo primero es darse cuenta que los picos altos de la mitad izquierda son mucho más altos que los de la derecha.
-			//Por ello, los hilos que trabajen con la mitad izquierda operarán con numeros más grandes, y viceversa
-		//Lo segundo es darse cuenta de las minas [cuando e^-x * sen^2(10x) es casi 0]. Estos puntos se llaman denormales, los que estan muy cerca de 0, pero no son 0.
+		//Sin embargo, si nos metemos a nivel matemático y gráfico, vemos este aspecto:
+		//Lo primero es darse cuenta de las minas [cuando e^-x * sen^2(10x) es casi 0]. Estos puntos se llaman denormales, los que estan muy cerca de 0, pero no son 0.
 		//Para identificar los puntos donde encontraremos numeros denormales, basta con igualar f(x) = 0, y ver que hay 4 puntos:
 			//x = 0, x = pi/10, x = 2pi/10 y x = 3pi/10. Las llamaremos minas
 		//En terminos de CPU, este tipo de numeros le cuesta infinitamente más que los demas numeros normales.
-		//Static en este caso divide 
+		
+		//Entonces, tenemos que aprox 99% de los valores de x son numeros normales, y el 1% estan en esa zona de minas.
+		//Ahora, tendriamos que ver que compensa más, si aplicar static con ese tiempo de desbalanceo de carga ocasionado por las minas, o si nos conviene mejor una tecnica dinámica con su tiempo extra de comunicacion de gestion de la pila.
+			//Static: genera desbalanceo de carga debido a que en las zonas de minas, el procesador que le toque tardará más tiempo que los demás, y dejara a los otros en standby
+			//Dynamic y guided: Corrigen el problema de static, pero le añaden a su tiempo el tiempo de comunicacion de la pila.
+	//Por lo tanto, concluimos que la respuesta la tendrán los resultados que veremos más abajo, ya que la cosa esta bastante empatada.
 	std::cout << "\n\n-- PARTE 2.1 -- Funcion pesada y Squeduling\n" << std::endl;
 	
 	double h = 1.0 / static_cast<double>(N);
@@ -259,5 +262,7 @@ void Parte2(long long N) {
 			<< std::fixed << std::setprecision(2) << eficiencia_dynamic << "\t\t"
 			<< std::fixed << std::setprecision(2) << eficiencia_guided
 			<< std::endl;
+		//Hablando con los resultados en mano, podemos concluir que hay un empate tecnico entre static y guided, saliendo static como la ligera ganadora, debido a que ese desbalanceo no es tan grande como el tiempo que consume guided en gestionar la pila. Dynamic se queja un poco atrás, ya que no cuenta con la inteligencia que aplica guided, aunque la verdad es que estan los tres bastante empatados.
+
 	}
 }
